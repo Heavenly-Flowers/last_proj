@@ -1,0 +1,2 @@
+key_api - sb_publishable_Xw2mfttSFjkmgZWK8mT2sQ_644P36pX
+proj_url - https://zdodrwqygpqwmvdwgrit.supabase.co/rest/v1/
