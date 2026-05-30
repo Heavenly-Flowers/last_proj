@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'screens/home_screen.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'sb_publishable_Xw2mfttSFjkmgZWK8mT2sQ_644P36pX',
+    url: 'https://zdodrwqygpqwmvdwgrit.supabase.co',
     anonKey: 'sb_publishable_Xw2mfttSFjkmgZWK8mT2sQ_644P36pX',
   );
 
@@ -26,26 +28,6 @@ class MyApp extends StatelessWidget {
         primaryColor: Colors.white,
       ),
       home: const HomeScreen(),
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text(
-          'Зерновуха ☕',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
     );
   }
 }
