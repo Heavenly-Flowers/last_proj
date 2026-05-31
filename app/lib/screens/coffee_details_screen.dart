@@ -71,7 +71,7 @@ class _CoffeeDetailsScreenState
                 horizontal: 16,
               ),
               child: Text(
-                'Состав: ${coffee.composition}',
+                'Состав: ${coffee.description}',
                 style: const TextStyle(
                   color: Colors.white70,
                 ),
