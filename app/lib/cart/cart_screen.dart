@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../screens/order_status_screen.dart';
 import '../services/order_service.dart';
 import 'cart_service.dart';
 
@@ -25,6 +27,7 @@ class _CartScreenState extends State<CartScreen> {
         foregroundColor: Colors.white,
       ),
       backgroundColor: Colors.black,
+
       body: cart.items.isEmpty
           ? const Center(
               child: Text(
@@ -127,19 +130,26 @@ class _CartScreenState extends State<CartScreen> {
                         height: 56,
                         child: ElevatedButton(
                           onPressed: () async {
-                            await orderService.createOrder(
+
+                            final orderId =
+                                await orderService
+                                    .createOrder(
                               cart.items,
                               cart.totalPrice,
                             );
+
                             cart.clear();
+
                             if (!mounted) return;
+
                             setState(() {});
-                            ScaffoldMessenger.of(
+
+                            Navigator.push(
                               context,
-                            ).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Заказ оформлен ☕',
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    OrderStatusScreen(
+                                  orderId: orderId,
                                 ),
                               ),
                             );

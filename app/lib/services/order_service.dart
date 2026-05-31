@@ -6,7 +6,7 @@ class OrderService {
 
   final supabase = Supabase.instance.client;
 
-  Future<void> createOrder(
+  Future<int> createOrder(
     List<CartItem> items,
     double totalPrice,
   ) async {
@@ -26,8 +26,9 @@ class OrderService {
           'items': orderItems,
           'total_price': totalPrice,
         })
-        .select();
+        .select()
+        .single();
 
-    print(response);
+    return response['id'];
   }
 }
