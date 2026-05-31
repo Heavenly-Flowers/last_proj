@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../services/order_service.dart';
 import 'cart_service.dart';
 
 class CartScreen extends StatefulWidget {
@@ -11,14 +11,18 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
 
+  final orderService = OrderService();
+
   @override
   Widget build(BuildContext context) {
+
     final cart = CartService.instance;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Корзина'),
         backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
       ),
       backgroundColor: Colors.black,
       body: cart.items.isEmpty
@@ -38,6 +42,7 @@ class _CartScreenState extends State<CartScreen> {
                   child: ListView.builder(
                     itemCount: cart.items.length,
                     itemBuilder: (context, index) {
+
                       final item = cart.items[index];
 
                       return Card(
@@ -74,7 +79,9 @@ class _CartScreenState extends State<CartScreen> {
                               const SizedBox(height: 8),
 
                               Text(
-                                'Допинги: ${item.toppings.isEmpty ? "Нет" : item.toppings.join(", ")}',
+                                item.toppings.isEmpty
+                                    ? 'Допинги: Нет'
+                                    : 'Допинги: ${item.toppings.join(", ")}',
                                 style: const TextStyle(
                                   color:
                                       Colors.white70,
@@ -119,13 +126,20 @@ class _CartScreenState extends State<CartScreen> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
+                            await orderService.createOrder(
+                              cart.items,
+                              cart.totalPrice,
+                            );
+                            cart.clear();
+                            if (!mounted) return;
+                            setState(() {});
                             ScaffoldMessenger.of(
                               context,
                             ).showSnackBar(
                               const SnackBar(
                                 content: Text(
-                                  'Оплата прошла успешно ☕',
+                                  'Заказ оформлен ☕',
                                 ),
                               ),
                             );

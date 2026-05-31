@@ -12,6 +12,10 @@ class CartService {
     items.add(item);
   }
 
+  void clear() {
+  items.clear();
+  }
+
   double get totalPrice {
     return items.fold(
       0,
