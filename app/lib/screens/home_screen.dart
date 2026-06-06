@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../cart/cart_screen.dart';
 import '../models/coffee.dart';
 import 'coffee_details_screen.dart';
-import 'orders_history_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -66,37 +64,6 @@ class HomeScreen extends StatelessWidget {
         title: const Text('Зерновуха'),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-
-        actions: [
-
-          IconButton(
-            onPressed: () {
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const OrdersHistoryScreen(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.history),
-          ),
-
-          IconButton(
-            onPressed: () {
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const CartScreen(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.shopping_cart),
-          ),
-        ],
       ),
 
       body: ListView.builder(
