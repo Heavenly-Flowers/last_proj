@@ -1,31 +1,26 @@
 import '../models/coffee.dart';
+import '../models/coffee_option.dart';
 
 class CartItem {
   final Coffee coffee;
-  final String size;
-  final List<String> toppings;
+  final CoffeeSizeOption size;
+  final List<ToppingOption> toppings;
   final int quantity;
 
   CartItem({
     required this.coffee,
     required this.size,
-    required this.toppings,
+    required List<ToppingOption> toppings,
     this.quantity = 1,
-  });
+  }) : toppings = List.unmodifiable(toppings);
 
-  double get totalPrice {
-    double price = coffee.price;
-
-    if (size == 'M') {
-      price += 30;
-    }
-
-    if (size == 'L') {
-      price += 60;
-    }
-
-    price += toppings.length * 20;
-
-    return price * quantity;
+  double get toppingsPrice {
+    return toppings.fold(0, (sum, topping) => sum + topping.price);
   }
+
+  double get unitPrice {
+    return coffee.price + size.extraPrice + toppingsPrice;
+  }
+
+  double get totalPrice => unitPrice * quantity;
 }
