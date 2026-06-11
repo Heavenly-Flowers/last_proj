@@ -2,25 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OrderStatusScreen extends StatefulWidget {
-
   final int orderId;
 
-  const OrderStatusScreen({
-    super.key,
-    required this.orderId,
-  });
+  const OrderStatusScreen({super.key, required this.orderId});
 
   @override
-  State<OrderStatusScreen> createState() =>
-      _OrderStatusScreenState();
+  State<OrderStatusScreen> createState() => _OrderStatusScreenState();
 }
 
-class _OrderStatusScreenState
-    extends State<OrderStatusScreen> {
-
+class _OrderStatusScreenState extends State<OrderStatusScreen> {
   final supabase = Supabase.instance.client;
 
-  String status = 'Готовится';
+  String status = 'обработка оплаты';
 
   RealtimeChannel? channel;
 
@@ -34,7 +27,6 @@ class _OrderStatusScreenState
   }
 
   Future<void> loadOrder() async {
-
     final response = await supabase
         .from('orders')
         .select()
@@ -49,7 +41,6 @@ class _OrderStatusScreenState
   }
 
   void listenStatus() {
-
     channel = supabase
         .channel('orders_channel')
         .onPostgresChanges(
@@ -57,12 +48,9 @@ class _OrderStatusScreenState
           schema: 'public',
           table: 'orders',
           callback: (payload) {
-
             final newData = payload.newRecord;
 
-            if (newData['id'].toString() ==
-                widget.orderId.toString()) {
-
+            if (newData['id'].toString() == widget.orderId.toString()) {
               if (!mounted) return;
 
               setState(() {
@@ -77,7 +65,6 @@ class _OrderStatusScreenState
 
   @override
   void dispose() {
-
     if (channel != null) {
       supabase.removeChannel(channel!);
     }
@@ -87,7 +74,6 @@ class _OrderStatusScreenState
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: Colors.black,
 
@@ -99,16 +85,11 @@ class _OrderStatusScreenState
 
       body: Center(
         child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-
             const Text(
               'Ваш заказ',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 22,
-              ),
+              style: TextStyle(color: Colors.white70, fontSize: 22),
             ),
 
             const SizedBox(height: 20),

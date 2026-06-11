@@ -12,12 +12,12 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-
   final orderService = OrderService();
+
+  bool isSubmitting = false;
 
   @override
   Widget build(BuildContext context) {
-
     final cart = CartService.instance;
 
     return Scaffold(
@@ -32,40 +32,31 @@ class _CartScreenState extends State<CartScreen> {
           ? const Center(
               child: Text(
                 'Корзина пуста',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 22),
               ),
             )
           : Column(
               children: [
-
                 Expanded(
                   child: ListView.builder(
                     itemCount: cart.items.length,
                     itemBuilder: (context, index) {
-
                       final item = cart.items[index];
 
                       return Card(
                         color: Colors.grey[900],
                         margin: const EdgeInsets.all(12),
                         child: Padding(
-                          padding:
-                              const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(16),
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-
                               Text(
                                 item.coffee.title,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 22,
-                                  fontWeight:
-                                      FontWeight.bold,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
 
@@ -73,10 +64,7 @@ class _CartScreenState extends State<CartScreen> {
 
                               Text(
                                 'Размер: ${item.size}',
-                                style: const TextStyle(
-                                  color:
-                                      Colors.white70,
-                                ),
+                                style: const TextStyle(color: Colors.white70),
                               ),
 
                               const SizedBox(height: 8),
@@ -85,10 +73,7 @@ class _CartScreenState extends State<CartScreen> {
                                 item.toppings.isEmpty
                                     ? 'Допинги: Нет'
                                     : 'Допинги: ${item.toppings.join(", ")}',
-                                style: const TextStyle(
-                                  color:
-                                      Colors.white70,
-                                ),
+                                style: const TextStyle(color: Colors.white70),
                               ),
 
                               const SizedBox(height: 12),
@@ -112,14 +97,12 @@ class _CartScreenState extends State<CartScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-
                       Text(
                         'Итого: ${cart.totalPrice.toStringAsFixed(0)} ₽',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
-                          fontWeight:
-                              FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
 
@@ -129,34 +112,61 @@ class _CartScreenState extends State<CartScreen> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: () async {
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  setState(() {
+                                    isSubmitting = true;
+                                  });
 
-                            final orderId =
-                                await orderService
-                                    .createOrder(
-                              cart.items,
-                              cart.totalPrice,
-                            );
+                                  try {
+                                    final orderId = await orderService
+                                        .createOrder(
+                                          cart.items,
+                                          cart.totalPrice,
+                                        );
 
-                            cart.clear();
+                                    cart.clear();
 
-                            if (!mounted) return;
+                                    if (!mounted) return;
 
-                            setState(() {});
+                                    setState(() {
+                                      isSubmitting = false;
+                                    });
 
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    OrderStatusScreen(
-                                  orderId: orderId,
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            'Оплатить',
-                          ),
+                                    if (!context.mounted) return;
+
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            OrderStatusScreen(orderId: orderId),
+                                      ),
+                                    );
+                                  } catch (_) {
+                                    if (!mounted) return;
+
+                                    setState(() {
+                                      isSubmitting = false;
+                                    });
+
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Не удалось создать заказ',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                          child: isSubmitting
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Оплатить'),
                         ),
                       ),
                     ],
