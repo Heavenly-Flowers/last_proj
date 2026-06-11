@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'order_status_screen.dart';
+
 class OrdersHistoryScreen extends StatefulWidget {
   const OrdersHistoryScreen({super.key});
 
@@ -15,12 +17,23 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
 
   bool isLoading = true;
   String? errorMessage;
+  RealtimeChannel? channel;
 
   @override
   void initState() {
     super.initState();
 
     loadOrders();
+    listenOrderStatuses();
+  }
+
+  @override
+  void dispose() {
+    if (channel != null) {
+      supabase.removeChannel(channel!);
+    }
+
+    super.dispose();
   }
 
   Future<void> loadOrders() async {
@@ -65,6 +78,45 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
     }
   }
 
+  void listenOrderStatuses() {
+    channel = supabase
+        .channel('orders_history_statuses')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'orders',
+          callback: (payload) {
+            final updatedOrder = payload.newRecord;
+            final updatedOrderId = updatedOrder['id']?.toString();
+
+            if (updatedOrderId == null) {
+              return;
+            }
+
+            final orderIndex = orders.indexWhere(
+              (order) =>
+                  (order as Map<String, dynamic>)['id'].toString() ==
+                  updatedOrderId,
+            );
+
+            if (orderIndex == -1 || !mounted) {
+              return;
+            }
+
+            setState(() {
+              final currentOrder = orders[orderIndex] as Map<String, dynamic>;
+
+              orders[orderIndex] = {
+                ...currentOrder,
+                'status': updatedOrder['status'],
+              };
+            });
+          },
+        );
+
+    channel!.subscribe();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,89 +148,90 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
               itemCount: orders.length,
               itemBuilder: (context, index) {
                 final order = orders[index] as Map<String, dynamic>;
-                final items = (order['order_items'] as List?) ?? [];
 
                 return Card(
                   color: Colors.grey[900],
                   margin: const EdgeInsets.all(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Заказ #${order['id']}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    onTap: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              OrderStatusScreen(orderId: order['id'] as int),
                         ),
+                      );
 
-                        const SizedBox(height: 12),
+                      if (!mounted) return;
 
-                        Text(
-                          'Статус: ${order['status']}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 18,
+                      loadOrders();
+                    },
+                    title: Text(
+                      'Заказ #${order['id']}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Время: ${formatOrderDate(order['created_at'])}',
+                            style: const TextStyle(color: Colors.white70),
                           ),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        Text(
-                          'Сумма: ${order['total_price']} ₽',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 18,
+                          const SizedBox(height: 4),
+                          Text(
+                            'Статус: ${order['status']}',
+                            style: const TextStyle(color: Colors.white70),
                           ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        const Text(
-                          'Состав:',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                          const SizedBox(height: 4),
+                          Text(
+                            'Сумма: ${formatPrice(order['total_price'])} ₽',
+                            style: const TextStyle(color: Colors.white70),
                           ),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        ...List.generate(items.length, (itemIndex) {
-                          final item = items[itemIndex] as Map<String, dynamic>;
-                          final toppingLinks =
-                              (item['order_item_toppings'] as List?) ?? [];
-                          final toppingNames = toppingLinks
-                              .map((link) {
-                                final topping =
-                                    (link as Map<String, dynamic>)['toppings']
-                                        as Map<String, dynamic>?;
-
-                                return topping?['name'] as String?;
-                              })
-                              .whereType<String>()
-                              .toList();
-
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              toppingNames.isEmpty
-                                  ? '${item['coffee_title']} (${item['size']}) - ${item['price']} ₽'
-                                  : '${item['coffee_title']} (${item['size']}) - ${item['price']} ₽, допинги: ${toppingNames.join(", ")}',
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          );
-                        }),
-                      ],
+                        ],
+                      ),
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right,
+                      color: Colors.white70,
                     ),
                   ),
                 );
               },
             ),
     );
+  }
+
+  String formatOrderDate(dynamic value) {
+    final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
+
+    if (date == null) {
+      return 'неизвестно';
+    }
+
+    return '${twoDigits(date.day)}.${twoDigits(date.month)}.${date.year} '
+        '${twoDigits(date.hour)}:${twoDigits(date.minute)}';
+  }
+
+  String formatPrice(dynamic value) {
+    final price = num.tryParse(value.toString());
+
+    if (price == null) {
+      return value.toString();
+    }
+
+    return price.toStringAsFixed(0);
+  }
+
+  String twoDigits(int value) {
+    return value.toString().padLeft(2, '0');
   }
 }

@@ -3,26 +3,23 @@ import '../cart/cart_item.dart';
 import '../cart/cart_service.dart';
 import '../models/coffee.dart';
 
-
 class CoffeeDetailsScreen extends StatefulWidget {
   final Coffee coffee;
 
-  const CoffeeDetailsScreen({
-    super.key,
-    required this.coffee,
-  });
+  const CoffeeDetailsScreen({super.key, required this.coffee});
 
   @override
-  State<CoffeeDetailsScreen> createState() =>
-      _CoffeeDetailsScreenState();
+  State<CoffeeDetailsScreen> createState() => _CoffeeDetailsScreenState();
 }
 
-class _CoffeeDetailsScreenState
-    extends State<CoffeeDetailsScreen> {
-
+class _CoffeeDetailsScreenState extends State<CoffeeDetailsScreen> {
   String selectedSize = 'M';
 
   final List<String> selectedToppings = [];
+
+  static const Map<String, double> sizePrices = {'S': 0, 'M': 30, 'L': 60};
+
+  static const double toppingPrice = 20;
 
   final List<String> toppings = [
     'Ванильный сироп',
@@ -33,21 +30,23 @@ class _CoffeeDetailsScreenState
     'Корица',
   ];
 
+  double get totalPrice {
+    final sizePrice = sizePrices[selectedSize] ?? 0;
+    final toppingsPrice = selectedToppings.length * toppingPrice;
+
+    return widget.coffee.price + sizePrice + toppingsPrice;
+  }
+
   @override
   Widget build(BuildContext context) {
     final coffee = widget.coffee;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(coffee.title),
-        backgroundColor: Colors.black,
-      ),
+      appBar: AppBar(title: Text(coffee.title), backgroundColor: Colors.black),
       body: SingleChildScrollView(
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             Image.network(
               coffee.imageUrl,
               width: double.infinity,
@@ -59,31 +58,22 @@ class _CoffeeDetailsScreenState
               padding: const EdgeInsets.all(16),
               child: Text(
                 coffee.description,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 18),
               ),
             ),
 
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 'Состав: ${coffee.description}',
-                style: const TextStyle(
-                  color: Colors.white70,
-                ),
+                style: const TextStyle(color: Colors.white70),
               ),
             ),
 
             const SizedBox(height: 24),
 
             const Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: 16,
-              ),
+              padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 'Размер',
                 style: TextStyle(
@@ -95,21 +85,14 @@ class _CoffeeDetailsScreenState
             ),
 
             Row(
-              mainAxisAlignment:
-                  MainAxisAlignment.center,
-              children: [
-                sizeButton('S'),
-                sizeButton('M'),
-                sizeButton('L'),
-              ],
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [sizeButton('S'), sizeButton('M'), sizeButton('L')],
             ),
 
             const SizedBox(height: 24),
 
             const Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: 16,
-              ),
+              padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 'Допинги',
                 style: TextStyle(
@@ -123,24 +106,16 @@ class _CoffeeDetailsScreenState
             ...toppings.map(
               (topping) => CheckboxListTile(
                 title: Text(
-                  topping,
-                  style: const TextStyle(
-                    color: Colors.white,
-                  ),
+                  '$topping +${toppingPrice.toStringAsFixed(0)} ₽',
+                  style: const TextStyle(color: Colors.white),
                 ),
-                value: selectedToppings.contains(
-                  topping,
-                ),
+                value: selectedToppings.contains(topping),
                 onChanged: (value) {
                   setState(() {
                     if (value == true) {
-                      selectedToppings.add(
-                        topping,
-                      );
+                      selectedToppings.add(topping);
                     } else {
-                      selectedToppings.remove(
-                        topping,
-                      );
+                      selectedToppings.remove(topping);
                     }
                   });
                 },
@@ -154,24 +129,20 @@ class _CoffeeDetailsScreenState
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () {
-                      final item = CartItem(
-                        coffee: coffee,
-                        size: selectedSize,
-                        toppings: selectedToppings,
-                      );
+                    final item = CartItem(
+                      coffee: coffee,
+                      size: selectedSize,
+                      toppings: List.of(selectedToppings),
+                    );
 
-                      CartService.instance.addItem(item);
+                    CartService.instance.addItem(item);
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Добавлено в корзину',
-                          ),
-                        ),
-                      );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Добавлено в корзину')),
+                    );
                   },
                   child: Text(
-                    'Добавить в корзину • ${coffee.price.toStringAsFixed(0)} ₽',
+                    'Добавить в корзину • ${totalPrice.toStringAsFixed(0)} ₽',
                   ),
                 ),
               ),
@@ -184,28 +155,23 @@ class _CoffeeDetailsScreenState
   }
 
   Widget sizeButton(String size) {
-    final isSelected =
-        selectedSize == size;
+    final isSelected = selectedSize == size;
+    final price = sizePrices[size] ?? 0;
+    final priceText = price == 0 ? '+0 ₽' : '+${price.toStringAsFixed(0)} ₽';
 
     return Padding(
       padding: const EdgeInsets.all(8),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isSelected
-                  ? Colors.white
-                  : Colors.grey[900],
-          foregroundColor:
-              isSelected
-                  ? Colors.black
-                  : Colors.white,
+          backgroundColor: isSelected ? Colors.white : Colors.grey[900],
+          foregroundColor: isSelected ? Colors.black : Colors.white,
         ),
         onPressed: () {
           setState(() {
             selectedSize = size;
           });
         },
-        child: Text(size),
+        child: Text('$size $priceText'),
       ),
     );
   }

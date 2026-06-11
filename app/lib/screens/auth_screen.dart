@@ -10,6 +10,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final supabase = Supabase.instance.client;
+  final formKey = GlobalKey<FormState>();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -24,13 +25,12 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> submit() async {
-    final email = emailController.text.trim();
-    final password = passwordController.text.trim();
-
-    if (email.isEmpty || password.isEmpty) {
-      showMessage('Введите email и пароль');
+    if (formKey.currentState?.validate() != true) {
       return;
     }
+
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
 
     setState(() {
       isLoading = true;
@@ -69,6 +69,35 @@ class _AuthScreenState extends State<AuthScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  String? validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+    if (email.isEmpty) {
+      return 'Введите email';
+    }
+
+    if (!emailRegex.hasMatch(email)) {
+      return 'Введите корректный email';
+    }
+
+    return null;
+  }
+
+  String? validatePassword(String? value) {
+    final password = value ?? '';
+
+    if (password.isEmpty) {
+      return 'Введите пароль';
+    }
+
+    if (password.length < 6) {
+      return 'Пароль должен быть не короче 6 символов';
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,65 +110,80 @@ class _AuthScreenState extends State<AuthScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                isLogin ? 'Вход' : 'Регистрация',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
+          child: Form(
+            key: formKey,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  isLogin ? 'Вход' : 'Регистрация',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 32),
+                TextFormField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  validator: validateEmail,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Пароль',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: passwordController,
+                  obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  validator: validatePassword,
+                  onFieldSubmitted: (_) {
+                    if (!isLoading) {
+                      submit();
+                    }
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Пароль',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : submit,
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(isLogin ? 'Войти' : 'Создать аккаунт'),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : submit,
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(isLogin ? 'Войти' : 'Создать аккаунт'),
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: isLoading
-                    ? null
-                    : () {
-                        setState(() {
-                          isLogin = !isLogin;
-                        });
-                      },
-                child: Text(
-                  isLogin
-                      ? 'Нет аккаунта? Зарегистрироваться'
-                      : 'Уже есть аккаунт? Войти',
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () {
+                          formKey.currentState?.reset();
+
+                          setState(() {
+                            isLogin = !isLogin;
+                          });
+                        },
+                  child: Text(
+                    isLogin
+                        ? 'Нет аккаунта? Зарегистрироваться'
+                        : 'Уже есть аккаунт? Войти',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

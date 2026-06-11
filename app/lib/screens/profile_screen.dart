@@ -10,6 +10,8 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final supabase = Supabase.instance.client;
+  final profileFormKey = GlobalKey<FormState>();
+  final supportFormKey = GlobalKey<FormState>();
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
   final supportController = TextEditingController();
@@ -75,6 +77,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    if (profileFormKey.currentState?.validate() != true) {
+      return;
+    }
+
     setState(() {
       isSaving = true;
     });
@@ -109,8 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    if (message.isEmpty) {
-      showMessage('Введите текст обращения');
+    if (supportFormKey.currentState?.validate() != true) {
       return;
     }
 
@@ -153,19 +158,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  String? validateName(String? value) {
+    final name = value?.trim() ?? '';
+    final nameRegex = RegExp(r"^[A-Za-zА-Яа-яЁё\s'-]+$");
+
+    if (name.isEmpty) {
+      return 'Введите имя';
+    }
+
+    if (name.length < 2) {
+      return 'Имя должно быть не короче 2 символов';
+    }
+
+    if (name.length > 60) {
+      return 'Имя должно быть не длиннее 60 символов';
+    }
+
+    if (!nameRegex.hasMatch(name)) {
+      return 'Имя может содержать только буквы, пробел, дефис и апостроф';
+    }
+
+    return null;
+  }
+
+  String? validatePhone(String? value) {
+    final phone = value?.trim() ?? '';
+    final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
+    final phoneRegex = RegExp(r'^\+?[0-9\s()\-]{10,20}$');
+
+    if (phone.isEmpty) {
+      return 'Введите телефон';
+    }
+
+    if (!phoneRegex.hasMatch(phone) ||
+        digitsOnly.length < 10 ||
+        digitsOnly.length > 15) {
+      return 'Введите корректный телефон';
+    }
+
+    return null;
+  }
+
+  String? validateSupportMessage(String? value) {
+    final message = value?.trim() ?? '';
+
+    if (message.isEmpty) {
+      return 'Введите текст обращения';
+    }
+
+    if (message.length < 10) {
+      return 'Опишите проблему минимум в 10 символах';
+    }
+
+    if (message.length > 1000) {
+      return 'Обращение должно быть не длиннее 1000 символов';
+    }
+
+    return null;
+  }
+
   void openSupportDialog() {
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Написать в поддержку'),
-          content: TextField(
-            controller: supportController,
-            minLines: 4,
-            maxLines: 8,
-            decoration: const InputDecoration(
-              labelText: 'Жалоба или претензия',
-              border: OutlineInputBorder(),
+          content: Form(
+            key: supportFormKey,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: TextFormField(
+              controller: supportController,
+              minLines: 4,
+              maxLines: 8,
+              maxLength: 1000,
+              validator: validateSupportMessage,
+              decoration: const InputDecoration(
+                labelText: 'Жалоба или претензия',
+                border: OutlineInputBorder(),
+              ),
             ),
           ),
           actions: [
@@ -212,57 +282,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                TextFormField(
-                  readOnly: true,
-                  initialValue: email,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
+          : Form(
+              key: profileFormKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  TextFormField(
+                    readOnly: true,
+                    initialValue: email,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Имя',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: nameController,
+                    textInputAction: TextInputAction.next,
+                    validator: validateName,
+                    decoration: const InputDecoration(
+                      labelText: 'Имя',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Телефон',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.done,
+                    validator: validatePhone,
+                    onFieldSubmitted: (_) {
+                      if (!isSaving) {
+                        saveProfile();
+                      }
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Телефон',
+                      hintText: '+7 999 123-45-67',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: isSaving ? null : saveProfile,
-                    child: isSaving
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Сохранить'),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: isSaving ? null : saveProfile,
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Сохранить'),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 56,
-                  child: OutlinedButton(
-                    onPressed: openSupportDialog,
-                    child: const Text('Написать в поддержку'),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: openSupportDialog,
+                      child: const Text('Написать в поддержку'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }
