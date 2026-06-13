@@ -6,6 +6,7 @@ import 'admin_support_screen.dart';
 import 'home_screen.dart';
 import 'orders_history_screen.dart';
 import 'profile_screen.dart';
+import 'work_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -83,6 +84,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       const OrdersHistoryScreen(),
       const CartScreen(),
       const ProfileScreen(),
+      if (isAdmin) const WorkScreen(),
       if (isAdmin) const AdminSupportScreen(),
     ];
 
@@ -94,6 +96,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         label: 'Корзина',
       ),
       const BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Профиль'),
+      if (isAdmin)
+        const BottomNavigationBarItem(icon: Icon(Icons.work), label: 'Работа'),
       if (isAdmin)
         const BottomNavigationBarItem(
           icon: Icon(Icons.admin_panel_settings),

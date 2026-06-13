@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -7,7 +6,6 @@ import '../cart/cart_item.dart';
 
 class OrderService {
   final supabase = Supabase.instance.client;
-  final Random _random = Random();
 
   static const List<String> statuses = [
     'обработка оплаты',
@@ -75,9 +73,23 @@ class OrderService {
       }
     }
 
-    unawaited(_advanceOrderStatuses(orderId));
+    unawaited(_acceptOrderAfterPayment(orderId));
 
     return orderId;
+  }
+
+  Future<void> _acceptOrderAfterPayment(int orderId) async {
+    try {
+      await Future.delayed(const Duration(seconds: 5));
+
+      await supabase
+          .from('orders')
+          .update({'status': 'принят'})
+          .eq('id', orderId)
+          .eq('status', 'обработка оплаты');
+    } catch (_) {
+      return;
+    }
   }
 
   Future<Map<String, int>> _loadToppingIds(List<CartItem> items) async {
@@ -96,21 +108,5 @@ class OrderService {
       for (final topping in response)
         topping['name'] as String: topping['id'] as int,
     };
-  }
-
-  Future<void> _advanceOrderStatuses(int orderId) async {
-    try {
-      for (final status in statuses.skip(1)) {
-        final delaySeconds = 4 + _random.nextInt(7);
-        await Future.delayed(Duration(seconds: delaySeconds));
-
-        await supabase
-            .from('orders')
-            .update({'status': status})
-            .eq('id', orderId);
-      }
-    } catch (_) {
-      return;
-    }
   }
 }
