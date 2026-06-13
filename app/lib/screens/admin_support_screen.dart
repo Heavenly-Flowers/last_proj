@@ -14,19 +14,35 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
   List supportRequests = [];
   List profiles = [];
   List roles = [];
+  List coffees = [];
+  List toppings = [];
 
   bool isLoadingSupport = true;
   bool isLoadingUsers = true;
+  bool isLoadingPrices = true;
   String? supportErrorMessage;
   String? usersErrorMessage;
+  String? pricesErrorMessage;
 
   String? get currentUserId => supabase.auth.currentUser?.id;
+  RealtimeChannel? pricesChannel;
 
   @override
   void initState() {
     super.initState();
     loadSupportRequests();
     loadUsers();
+    loadPrices();
+    listenPrices();
+  }
+
+  @override
+  void dispose() {
+    if (pricesChannel != null) {
+      supabase.removeChannel(pricesChannel!);
+    }
+
+    super.dispose();
   }
 
   Future<void> loadSupportRequests() async {
@@ -91,6 +107,79 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
     }
   }
 
+  Future<void> loadPrices() async {
+    setState(() {
+      isLoadingPrices = true;
+    });
+
+    try {
+      final coffeesResponse = await supabase
+          .from('coffees')
+          .select('id, title, price')
+          .eq('is_active', true)
+          .order('id');
+
+      final toppingsResponse = await supabase
+          .from('toppings')
+          .select('id, name, price')
+          .order('id');
+
+      if (!mounted) return;
+
+      setState(() {
+        coffees = coffeesResponse;
+        toppings = toppingsResponse;
+        pricesErrorMessage = null;
+        isLoadingPrices = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        pricesErrorMessage = 'Не удалось загрузить цены';
+        isLoadingPrices = false;
+      });
+    }
+  }
+
+  void listenPrices() {
+    pricesChannel = supabase
+        .channel('admin_prices')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'coffees',
+          callback: (_) {
+            loadPrices();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'toppings',
+          callback: (_) {
+            loadPrices();
+          },
+        );
+
+    pricesChannel!.subscribe();
+  }
+
+  Future<void> updatePrice({
+    required String table,
+    required int id,
+    required double price,
+  }) async {
+    try {
+      await supabase.from(table).update({'price': price}).eq('id', id);
+
+      await loadPrices();
+      showMessage('Цена обновлена');
+    } catch (_) {
+      showMessage('Не удалось обновить цену');
+    }
+  }
+
   Future<void> updateUserRole({
     required String userId,
     required int roleId,
@@ -132,7 +221,7 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -143,10 +232,13 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
             tabs: [
               Tab(text: 'Жалобы'),
               Tab(text: 'Управление'),
+              Tab(text: 'Цены'),
             ],
           ),
         ),
-        body: TabBarView(children: [buildSupportTab(), buildUsersTab()]),
+        body: TabBarView(
+          children: [buildSupportTab(), buildUsersTab(), buildPricesTab()],
+        ),
       ),
     );
   }
@@ -325,6 +417,198 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget buildPricesTab() {
+    if (isLoadingPrices) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (pricesErrorMessage != null) {
+      return Center(
+        child: Text(
+          pricesErrorMessage!,
+          style: const TextStyle(color: Colors.white, fontSize: 22),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: loadPrices,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text(
+              'Кофе',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ...coffees.map((coffeeData) {
+            final coffee = coffeeData as Map<String, dynamic>;
+
+            return priceCard(
+              title: coffee['title'] as String,
+              price: (coffee['price'] as num).toDouble(),
+              onEdit: () {
+                openPriceDialog(
+                  title: coffee['title'] as String,
+                  currentPrice: (coffee['price'] as num).toDouble(),
+                  onSave: (price) {
+                    updatePrice(
+                      table: 'coffees',
+                      id: coffee['id'] as int,
+                      price: price,
+                    );
+                  },
+                );
+              },
+            );
+          }),
+          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text(
+              'Допинги',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ...toppings.map((toppingData) {
+            final topping = toppingData as Map<String, dynamic>;
+
+            return priceCard(
+              title: topping['name'] as String,
+              price: (topping['price'] as num).toDouble(),
+              onEdit: () {
+                openPriceDialog(
+                  title: topping['name'] as String,
+                  currentPrice: (topping['price'] as num).toDouble(),
+                  onSave: (price) {
+                    updatePrice(
+                      table: 'toppings',
+                      id: topping['id'] as int,
+                      price: price,
+                    );
+                  },
+                );
+              },
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget priceCard({
+    required String title,
+    required double price,
+    required VoidCallback onEdit,
+  }) {
+    return Card(
+      color: Colors.grey[900],
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text(
+          '${price.toStringAsFixed(0)} ₽',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        trailing: IconButton(
+          onPressed: onEdit,
+          icon: const Icon(Icons.edit),
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  void openPriceDialog({
+    required String title,
+    required double currentPrice,
+    required ValueChanged<double> onSave,
+  }) {
+    final controller = TextEditingController(
+      text: currentPrice.toStringAsFixed(0),
+    );
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Цена',
+                suffixText: '₽',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                final price = double.tryParse(
+                  (value ?? '').replaceAll(',', '.').trim(),
+                );
+
+                if (price == null) {
+                  return 'Введите число';
+                }
+
+                if (price < 0) {
+                  return 'Цена не может быть отрицательной';
+                }
+
+                if (price > 100000) {
+                  return 'Цена слишком большая';
+                }
+
+                return null;
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Отмена'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) {
+                  return;
+                }
+
+                final price = double.parse(
+                  controller.text.replaceAll(',', '.').trim(),
+                );
+
+                Navigator.of(dialogContext).pop();
+                onSave(price);
+              },
+              child: const Text('Сохранить'),
+            ),
+          ],
+        );
+      },
     );
   }
 

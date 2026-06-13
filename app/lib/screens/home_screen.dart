@@ -1,159 +1,174 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/coffee.dart';
+import '../services/coffee_service.dart';
 import 'coffee_details_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final supabase = Supabase.instance.client;
+  final coffeeService = CoffeeService();
+
+  late Future<List<Coffee>> coffeesFuture;
+  RealtimeChannel? channel;
+
+  @override
+  void initState() {
+    super.initState();
+    coffeesFuture = coffeeService.getCoffees();
+    listenCoffeePrices();
+  }
+
+  @override
+  void dispose() {
+    if (channel != null) {
+      supabase.removeChannel(channel!);
+    }
+
+    super.dispose();
+  }
+
+  Future<void> refreshCoffees() async {
+    setState(() {
+      coffeesFuture = coffeeService.getCoffees();
+    });
+
+    await coffeesFuture;
+  }
+
+  void listenCoffeePrices() {
+    channel = supabase
+        .channel('home_coffees')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'coffees',
+          callback: (_) {
+            if (!mounted) return;
+
+            setState(() {
+              coffeesFuture = coffeeService.getCoffees();
+            });
+          },
+        );
+
+    channel!.subscribe();
+  }
+
+  @override
   Widget build(BuildContext context) {
-
-    final coffees = [
-
-      Coffee(
-        title: 'Эспрессо',
-        description:
-            'Крепкий классический кофе',
-        price: 150,
-        imageUrl:
-            'https://images.unsplash.com/photo-1510707577719-ae7c14805e3a',
-      ),
-
-      Coffee(
-        title: 'Капучино',
-        description:
-            'Кофе с молочной пенкой',
-        price: 220,
-        imageUrl:
-            'https://images.unsplash.com/photo-1509042239860-f550ce710b93',
-      ),
-
-      Coffee(
-        title: 'Латте',
-        description:
-            'Нежный молочный кофе',
-        price: 240,
-        imageUrl:
-            'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085',
-      ),
-
-      Coffee(
-        title: 'Американо',
-        description:
-            'Разбавленный эспрессо',
-        price: 180,
-        imageUrl:
-            'https://images.unsplash.com/photo-1498804103079-a6351b050096',
-      ),
-
-      Coffee(
-        title: 'Раф',
-        description:
-            'Сливочный сладкий кофе',
-        price: 270,
-        imageUrl:
-            'https://images.unsplash.com/photo-1511920170033-f8396924c348',
-      ),
-    ];
-
     return Scaffold(
       backgroundColor: Colors.black,
-
       appBar: AppBar(
         title: const Text('Зерновуха'),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
       ),
+      body: FutureBuilder<List<Coffee>>(
+        future: coffeesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-      body: ListView.builder(
-        itemCount: coffees.length,
-        itemBuilder: (context, index) {
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text(
+                'Не удалось загрузить меню',
+                style: TextStyle(color: Colors.white, fontSize: 22),
+              ),
+            );
+          }
 
-          final coffee = coffees[index];
+          final coffees = snapshot.data ?? [];
 
-          return GestureDetector(
-            onTap: () {
+          if (coffees.isEmpty) {
+            return const Center(
+              child: Text(
+                'Меню пока пустое',
+                style: TextStyle(color: Colors.white, fontSize: 22),
+              ),
+            );
+          }
 
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      CoffeeDetailsScreen(
-                    coffee: coffee,
-                  ),
-                ),
-              );
-            },
+          return RefreshIndicator(
+            onRefresh: refreshCoffees,
+            child: ListView.builder(
+              itemCount: coffees.length,
+              itemBuilder: (context, index) {
+                final coffee = coffees[index];
 
-            child: Card(
-              color: Colors.grey[900],
-              margin: const EdgeInsets.all(12),
-
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-
-                  ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(
-                      top: Radius.circular(12),
-                    ),
-
-                    child: Image.network(
-                      coffee.imageUrl,
-                      height: 220,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-
-                  Padding(
-                    padding:
-                        const EdgeInsets.all(16),
-
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CoffeeDetailsScreen(coffee: coffee),
+                      ),
+                    );
+                  },
+                  child: Card(
+                    color: Colors.grey[900],
+                    margin: const EdgeInsets.all(12),
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
-                        Text(
-                          coffee.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight:
-                                FontWeight.bold,
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(12),
+                          ),
+                          child: Image.network(
+                            coffee.imageUrl,
+                            height: 220,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
                           ),
                         ),
-
-                        const SizedBox(height: 8),
-
-                        Text(
-                          coffee.description,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        Text(
-                          '${coffee.price.toStringAsFixed(0)} ₽',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight:
-                                FontWeight.bold,
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                coffee.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                coffee.description,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                '${coffee.price.toStringAsFixed(0)} ₽',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           );
         },

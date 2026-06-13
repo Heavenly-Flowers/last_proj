@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../cart/cart_item.dart';
 import '../cart/cart_service.dart';
 import '../models/coffee.dart';
@@ -13,28 +15,93 @@ class CoffeeDetailsScreen extends StatefulWidget {
 }
 
 class _CoffeeDetailsScreenState extends State<CoffeeDetailsScreen> {
+  final supabase = Supabase.instance.client;
+
   String selectedSize = 'M';
 
   final List<String> selectedToppings = [];
+  List toppings = [];
+  bool isLoadingToppings = true;
+  RealtimeChannel? channel;
 
   static const Map<String, double> sizePrices = {'S': 0, 'M': 30, 'L': 60};
 
-  static const double toppingPrice = 20;
+  @override
+  void initState() {
+    super.initState();
+    loadToppings();
+    listenToppingPrices();
+  }
 
-  final List<String> toppings = [
-    'Ванильный сироп',
-    'Карамельный сироп',
-    'Лесной орех',
-    'Маршмеллоу',
-    'Печеньки',
-    'Корица',
-  ];
+  @override
+  void dispose() {
+    if (channel != null) {
+      supabase.removeChannel(channel!);
+    }
+
+    super.dispose();
+  }
 
   double get totalPrice {
     final sizePrice = sizePrices[selectedSize] ?? 0;
-    final toppingsPrice = selectedToppings.length * toppingPrice;
+    final toppingsPrice = selectedToppings.fold<double>(
+      0,
+      (sum, topping) => sum + getToppingPrice(topping),
+    );
 
     return widget.coffee.price + sizePrice + toppingsPrice;
+  }
+
+  void listenToppingPrices() {
+    channel = supabase
+        .channel('coffee_details_toppings')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'toppings',
+          callback: (_) {
+            loadToppings();
+          },
+        );
+
+    channel!.subscribe();
+  }
+
+  Future<void> loadToppings() async {
+    try {
+      final response = await supabase
+          .from('toppings')
+          .select('id, name, price')
+          .order('id');
+
+      if (!mounted) return;
+
+      setState(() {
+        toppings = response;
+        isLoadingToppings = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoadingToppings = false;
+      });
+    }
+  }
+
+  double getToppingPrice(String name) {
+    final topping = toppings.cast<Map<String, dynamic>?>().firstWhere(
+      (topping) => topping?['name'] == name,
+      orElse: () => null,
+    );
+
+    return ((topping?['price'] ?? 20) as num).toDouble();
+  }
+
+  Map<String, double> get selectedToppingPrices {
+    return {
+      for (final topping in selectedToppings) topping: getToppingPrice(topping),
+    };
   }
 
   @override
@@ -103,24 +170,34 @@ class _CoffeeDetailsScreenState extends State<CoffeeDetailsScreen> {
               ),
             ),
 
-            ...toppings.map(
-              (topping) => CheckboxListTile(
-                title: Text(
-                  '$topping +${toppingPrice.toStringAsFixed(0)} ₽',
-                  style: const TextStyle(color: Colors.white),
-                ),
-                value: selectedToppings.contains(topping),
-                onChanged: (value) {
-                  setState(() {
-                    if (value == true) {
-                      selectedToppings.add(topping);
-                    } else {
-                      selectedToppings.remove(topping);
-                    }
-                  });
-                },
-              ),
-            ),
+            if (isLoadingToppings)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else
+              ...toppings.map((toppingData) {
+                final topping = toppingData as Map<String, dynamic>;
+                final name = topping['name'] as String;
+                final price = (topping['price'] as num).toDouble();
+
+                return CheckboxListTile(
+                  title: Text(
+                    '$name +${price.toStringAsFixed(0)} ₽',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  value: selectedToppings.contains(name),
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        selectedToppings.add(name);
+                      } else {
+                        selectedToppings.remove(name);
+                      }
+                    });
+                  },
+                );
+              }),
 
             Padding(
               padding: const EdgeInsets.all(16),
@@ -133,6 +210,7 @@ class _CoffeeDetailsScreenState extends State<CoffeeDetailsScreen> {
                       coffee: coffee,
                       size: selectedSize,
                       toppings: List.of(selectedToppings),
+                      toppingPrices: selectedToppingPrices,
                     );
 
                     CartService.instance.addItem(item);

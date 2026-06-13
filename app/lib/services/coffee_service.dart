@@ -8,10 +8,17 @@ class CoffeeService {
   Future<List<Coffee>> getCoffees() async {
     final response = await supabase
         .from('coffees')
-        .select();
+        .select()
+        .eq('is_active', true)
+        .order('id');
 
-    return (response as List)
-        .map((json) => Coffee.fromJson(json))
-        .toList();
+    return (response as List).map((json) => Coffee.fromJson(json)).toList();
+  }
+
+  Future<void> updateCoffeePrice({
+    required int coffeeId,
+    required double price,
+  }) async {
+    await supabase.from('coffees').update({'price': price}).eq('id', coffeeId);
   }
 }

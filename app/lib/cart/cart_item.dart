@@ -4,12 +4,14 @@ class CartItem {
   final Coffee coffee;
   final String size;
   final List<String> toppings;
+  final Map<String, double> toppingPrices;
   final int quantity;
 
   CartItem({
     required this.coffee,
     required this.size,
     required this.toppings,
+    this.toppingPrices = const {},
     this.quantity = 1,
   });
 
@@ -24,7 +26,9 @@ class CartItem {
       price += 60;
     }
 
-    price += toppings.length * 20;
+    for (final topping in toppings) {
+      price += toppingPrices[topping] ?? 20;
+    }
 
     return price * quantity;
   }
